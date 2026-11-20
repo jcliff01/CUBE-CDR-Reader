@@ -28,3 +28,19 @@ With Zig 0.14.1, run from the repository root. This works on Windows or from a L
 ```sh
 zig cc -target x86_64-windows-gnu -municode -Wl,--subsystem,windows -std=c11 -O2 -s cdr.c main.c -lcomctl32 -lshell32 -lole32 -lgdi32 -o CUBE-CDR-Reader.exe
 ```
+
+## C# Windows desktop build
+
+The C# edition uses Windows Forms and .NET 8. To run it from source on Windows with the .NET 8 SDK installed:
+
+```powershell
+dotnet run --project csharp/CubeCdrReader.csproj
+```
+
+To publish a portable Windows x64 executable that includes the .NET runtime:
+
+```powershell
+dotnet publish csharp/CubeCdrReader.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o publish-csharp
+```
+
+Run `publish-csharp/CUBE-CDR-Reader.exe` and use **Open Folder** to load your accounting files.
