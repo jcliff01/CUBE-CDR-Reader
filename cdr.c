@@ -55,6 +55,20 @@ static int locate(char *const *field, int count, const char *a, const char *b, c
     return -1;
 }
 
+static const char *endpoint_keys[][3] = {
+    {"remote-signaling-ip", "h323-remote-address", "remote-ip"},
+    {"remote-signaling-port", "remote-sip-port", NULL},
+    {"remote-udp-port", NULL, NULL},
+    {"remote-media-address", "remote-media-ip", "remote-rtp-ip"},
+    {"remote-media-udp-port", "remote-media-port", "remote-rtp-port"},
+    {"local-signaling-ip", "local-ip", "local-address"},
+    {"local-signaling-port", "local-sip-port", NULL},
+    {"local-media-address", "local-media-ip", "local-rtp-ip"},
+    {"local-media-udp-port", "local-media-port", "local-rtp-port"}
+};
+_Static_assert(LOCAL_MEDIA_PORT - REMOTE_IP + 1 ==
+               sizeof(endpoint_keys) / sizeof(endpoint_keys[0]), "endpoint columns");
+
 int read_header(char *const *field, int count, Schema *schema)
 {
 #define COL(a,b,c) locate(field, count, a, b, c)
@@ -71,11 +85,20 @@ int read_header(char *const *field, int count, Schema *schema)
         COL("h323-disconnect-time","disconnect-time","end-time"),
         COL("h323-call-origin","call-origin","leg"),
         COL("call-id","sip-call-id",NULL),
-        COL("h323-conf-id","conference-id",NULL)
+        COL("h323-conf-id","conference-id",NULL),
+        {0},
+        COL("forwarded","call-forwarded","is-forwarded"),
+        COL("forwarded-to","forward-to","fwdto"),
+        COL("feature-id_field1","feature-name","feature"),
+        COL("feature-id_field3","feature-status","frs"),
+        COL("feature-id_field11",NULL,NULL)
     };
 #undef COL
     if (candidate.setup < 0 && candidate.end < 0) return 0;
     if (candidate.calling < 0 && candidate.called < 0 && candidate.call_id < 0) return 0;
+    for (int i = 0; i < LOCAL_MEDIA_PORT - REMOTE_IP + 1; ++i)
+        candidate.endpoint[i] = locate(field, count, endpoint_keys[i][0],
+                                       endpoint_keys[i][1], endpoint_keys[i][2]);
     *schema = candidate;
     return 1;
 }
@@ -103,6 +126,11 @@ static int cause_like(const char *text)
     return *text && text[strspn(text, "0123456789abcdefABCDEF")] == '\0';
 }
 
+static int forward_feature(const char *feature)
+{
+    return same_key(feature, "CFA") || same_key(feature, "CFNA") || same_key(feature, "CFBY");
+}
+
 static int positional(char *const *field, int count, Schema *schema)
 {
     if (count < 21 || !digits(field[0]) || !digits(field[1]) ||
@@ -126,12 +154,56 @@ static int positional(char *const *field, int count, Schema *schema)
     if (count > cause + 24 && (!*at(field, count, codec) || digits(field[codec])) &&
         isalpha((unsigned char)field[cause + 24][0]))
         codec = cause + 24;
-    if (digits(at(field, count, codec))) codec = -1;
+    int compact_feature = count > cause + 13 && strchr(field[cause + 13], ':') &&
+                          *field[cause + 12] && !digits(field[cause + 12]);
+    int detailed = !compact_feature && count > cause + 23;
+    int ports = cause + 25 + (cause != 9 && codec == cause + 24);
+    if (!detailed || digits(at(field, count, codec))) codec = -1;
+    int feature = -1;
+    for (int i = cause + 12; i + 1 < count; ++i) {
+        if (i > cause + 12 && i < 100) continue;
+        if (forward_feature(field[i]) && strchr(field[i + 1], ':')) {
+            feature = i;
+            break;
+        }
+    }
     *schema = (Schema){
         setup, cause + 10, cause + 11, -1, codec, -1, cause, cause + 1,
-        cause - 2, cause - 1, cause + 2, 1, 4
+        cause - 2, cause - 1, cause + 2, 1, 4,
+        {-1, -1, detailed ? ports : -1, detailed ? cause + 60 : -1,
+         detailed ? ports + 1 : -1, -1, -1, -1, -1},
+        -1, -1, feature, feature < 0 ? -1 : feature + 2, feature < 0 ? -1 : feature + 10
     };
     return 1;
+}
+
+static const char *attribute(const char *value, const char *key)
+{
+    const char *equal = strchr(value, '=');
+    if (!equal) return "";
+    size_t length = (size_t)(equal - value);
+    if (length >= 64) return "";
+    char name[64];
+    memcpy(name, value, length);
+    name[length] = '\0';
+    return same_key(name, key) ? equal + 1 : "";
+}
+
+static int port_like(const char *value)
+{
+    if (!digits(value)) return 0;
+    unsigned long port = strtoul(value, NULL, 10);
+    return port > 0 && port <= 65535;
+}
+
+static int ip_like(const char *value)
+{
+    if (strchr(value, ':'))
+        return strspn(value, "0123456789abcdefABCDEF:.") == strlen(value);
+    int a, b, c, d, end = 0;
+    return sscanf(value, "%3d.%3d.%3d.%3d%n", &a, &b, &c, &d, &end) == 4 &&
+           !value[end] && (unsigned)a <= 255 && (unsigned)b <= 255 &&
+           (unsigned)c <= 255 && (unsigned)d <= 255;
 }
 
 static int leap(int year)
@@ -202,6 +274,7 @@ static const char *release_party(const char *value, char *label, size_t size)
 int read_record(char *const *field, int count, const Schema *header, Record *record)
 {
     Schema inferred;
+    int native = header == NULL;
     if (!header) {
         if (!positional(field, count, &inferred)) return 0;
         header = &inferred;
@@ -223,10 +296,44 @@ int read_record(char *const *field, int count, const Schema *header, Record *rec
     record->cell[CALL_ID] = GET(call_id);
     record->cell[CONFERENCE] = GET(conference);
     record->cell[SOURCE] = "";
+    const char *feature = GET(feature);
+    const char *feature_status = GET(feature_status);
+    const char *flag = GET(forwarded);
+    const char *target = GET(forward_to);
+    if (!*target && forward_feature(feature)) target = GET(feature_target);
+    for (int i = 0; i < LOCAL_MEDIA_PORT - REMOTE_IP + 1; ++i)
+        record->cell[REMOTE_IP + i] = at(field, count, header->endpoint[i]);
 #undef GET
     if (!*record->cell[SETUP] && !*record->cell[CALL_ID] && !*record->cell[END]) return 0;
     for (int i = 0; i < count && !*release; ++i)
         if (!strncmp(field[i], "release-source=", 15)) release = field[i] + 15;
+    if (native) {
+        if (!ip_like(record->cell[REMOTE_MEDIA_IP])) record->cell[REMOTE_MEDIA_IP] = "";
+        if (!port_like(record->cell[REMOTE_UDP_PORT])) record->cell[REMOTE_UDP_PORT] = "";
+        if (!port_like(record->cell[REMOTE_MEDIA_PORT])) record->cell[REMOTE_MEDIA_PORT] = "";
+    }
+    for (int i = 0; i < count; ++i) {
+        if (!strchr(field[i], '=')) continue;
+        for (int col = 0; col < LOCAL_MEDIA_PORT - REMOTE_IP + 1; ++col) {
+            if (*record->cell[REMOTE_IP + col]) continue;
+            for (int k = 0; k < 3 && endpoint_keys[col][k]; ++k) {
+                const char *value = attribute(field[i], endpoint_keys[col][k]);
+                if (*value) {
+                    record->cell[REMOTE_IP + col] = value;
+                    break;
+                }
+            }
+        }
+    }
+    if (same_key(flag, "yes") || same_key(flag, "true") || !strcmp(flag, "1"))
+        record->cell[FORWARDED] = "Yes";
+    else if (same_key(flag, "no") || same_key(flag, "false") || !strcmp(flag, "0"))
+        record->cell[FORWARDED] = "No";
+    else if (forward_feature(feature))
+        record->cell[FORWARDED] = !strcmp(feature_status, "0") ? "Yes" : "Forwarding event";
+    else
+        record->cell[FORWARDED] = "Unknown";
+    record->cell[FORWARDED_TO] = target;
     record->cell[RELEASE] = release_party(release, record->release, sizeof(record->release));
     record->cell[DURATION] = explicit_duration;
     if (!*explicit_duration && cdr_timestamp(record->cell[CONNECT], &start, start_zone) &&

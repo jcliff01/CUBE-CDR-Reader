@@ -4,7 +4,7 @@ A portable Windows desktop viewer for Cisco Unified Border Element SIP call acco
 
 1. Download [CUBE-CDR-Reader.exe](../../raw/main/CUBE-CDR-Reader.exe) to a Windows 10 or 11 x64 PC.
 2. Run it and choose **Open Folder**. Select the directory containing your exported CDRs.
-3. Search by phone number, codec, release source, reason, call ID, or any other displayed value. Click a column heading to sort. Scroll right for timestamps, call origin, IDs, and source file and line number.
+3. Search by phone number, codec, IP address, port, forwarding status, call ID, or any other displayed value. Click a column heading to sort. Scroll right for timestamps, call origin, IDs, and source file and line number.
 
 The app runs locally with no installer or network connection. It reads the selected folder's top level and opens input files read-only. It accepts CSV, CDR, LOG, TXT, extensionless files, and Cisco timestamp filenames ending in a numeric suffix. The status bar reports skipped rows, file errors, and when the 250,000-row limit is reached.
 
@@ -17,6 +17,9 @@ The app runs locally with no installer or network connection. It reads the selec
 - For the widest field coverage, use detailed file accounting. Compact files may omit codec and release source.
 
 [Cisco IOS Voice Gateway CDR accounting reference](https://www.cisco.com/c/en/us/td/docs/ios/voice/cdr/developer/manual/cdrdev.pdf)
+
+- Endpoint columns show signaling and media addresses and ports when recorded. Native detailed files can supply the remote media IP and UDP ports. Local endpoints and SIP signaling ports require explicitly named fields in the export. Missing endpoints appear blank.
+- **Forwarded** shows **Yes** or **No** for explicit flags. Cisco forwarding feature records (CFA, CFNA, CFBY) show **Yes** for a successful event or **Forwarding event** when success is unconfirmed. Rows without forwarding evidence show **Unknown**. Forwarded-to displays the destination when supplied. Status applies to the individual record.
 
 ## Build
 
