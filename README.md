@@ -31,7 +31,7 @@ zig cc -target x86_64-windows-gnu -municode -Wl,--subsystem,windows -std=c11 -O2
 
 ## C# Windows desktop build
 
-The C# edition uses Windows Forms and .NET 8. To run it from source on Windows with the .NET 8 SDK installed:
+The C# edition uses Windows Forms and .NET 8. The checked-in [Windows x64 executable](./csharp/CUBE-CDR-Reader.exe) requires the .NET 8 Desktop Runtime (x64). To run it from source on Windows with the .NET 8 SDK installed:
 
 ```powershell
 dotnet run --project csharp/CubeCdrReader.csproj
@@ -40,7 +40,7 @@ dotnet run --project csharp/CubeCdrReader.csproj
 To publish a portable Windows x64 executable that includes the .NET runtime:
 
 ```powershell
-dotnet publish csharp/CubeCdrReader.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o publish-csharp
+dotnet publish csharp/CubeCdrReader.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish-csharp
 ```
 
 Run `publish-csharp/CUBE-CDR-Reader.exe` and use **Open Folder** to load your accounting files.
