@@ -33,10 +33,13 @@ typedef struct {
 
 static const wchar_t *headings[] = {
     L"Date / setup time", L"Calling", L"Called", L"Duration (s)", L"Codec",
-    L"Disconnected by", L"Cause code (raw)", L"Reason", L"Connect time", L"Disconnect time",
+    L"Disconnected by", L"Cause code (raw)", L"Reason", L"Forwarded", L"Forwarded to",
+    L"Remote signaling IP", L"Remote SIP port", L"Remote UDP port", L"Remote media IP",
+    L"Remote media port", L"Local signaling IP", L"Local SIP port", L"Local media IP",
+    L"Local media port", L"Connect time", L"Disconnect time",
     L"Call origin", L"Call ID", L"Conference ID", L"Source file : line"
 };
-static const int widths[] = {245,120,120,99,115,174,122,225,245,245,100,115,235,235};
+static const int widths[] = {245,120,120,99,115,174,122,225,122,125,170,125,125,170,125,170,125,170,125,245,245,100,115,235,235};
 
 static HWND window, open_button, search_label, search_box, grid, status;
 static Results *results;
