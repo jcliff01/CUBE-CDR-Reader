@@ -27,6 +27,9 @@ internal sealed class ReaderWindow : Form
 
     private readonly Button open = new() { Text = "Open Folder...", AutoSize = true };
     private readonly TextBox search = new() { MaxLength = 255, Dock = DockStyle.Fill };
+    private readonly Button toggleFilters = new() { Text = "Show filters", AutoSize = true };
+    private readonly FilterPanel filters = new() { Visible = false };
+    private bool filtersExpanded;
     private readonly ListView grid = new()
     {
         Dock = DockStyle.Fill,
@@ -38,6 +41,7 @@ internal sealed class ReaderWindow : Form
     };
     private readonly Label status = new() { AutoSize = true, Text = "Open a folder to read CUBE call legs." };
     private ImportResult? result;
+    private int[]? filteredRows;
     private List<int> visible = [];
     private int sortColumn = -1;
     private bool descending;
@@ -52,27 +56,45 @@ internal sealed class ReaderWindow : Form
 
         var layout = new TableLayoutPanel
         {
-            ColumnCount = 3, RowCount = 3, Dock = DockStyle.Fill, Padding = new Padding(9)
+            ColumnCount = 4, RowCount = 4, Dock = DockStyle.Fill, Padding = new Padding(9)
         };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.Controls.Add(open, 0, 0);
-        layout.Controls.Add(new Label { Text = "Search", Anchor = AnchorStyles.Left, AutoSize = true }, 1, 0);
+        layout.Controls.Add(new Label { Text = "Search all", Anchor = AnchorStyles.Left, AutoSize = true }, 1, 0);
+        search.AccessibleName = "Search all columns";
         layout.Controls.Add(search, 2, 0);
-        layout.Controls.Add(grid, 0, 1);
-        layout.SetColumnSpan(grid, 3);
-        layout.Controls.Add(status, 0, 2);
-        layout.SetColumnSpan(status, 3);
+        layout.Controls.Add(toggleFilters, 3, 0);
+        layout.Controls.Add(filters, 0, 1);
+        layout.SetColumnSpan(filters, 4);
+        layout.Controls.Add(grid, 0, 2);
+        layout.SetColumnSpan(grid, 4);
+        layout.Controls.Add(status, 0, 3);
+        layout.SetColumnSpan(status, 4);
         Controls.Add(layout);
 
         foreach (var (title, width) in Columns)
             grid.Columns.Add(title, width);
 
         open.Click += OpenFolder;
+        toggleFilters.Click += (_, _) =>
+        {
+            filtersExpanded = !filtersExpanded;
+            MinimumSize = filtersExpanded ? new Size(850, 520) : new Size(670, 240);
+            filters.Visible = filtersExpanded;
+            UpdateFilterButton();
+        };
+        filters.FiltersChanged += (_, _) =>
+        {
+            UpdateFilterButton();
+            ApplyFilters();
+        };
         search.TextChanged += (_, _) => RefreshRows();
         grid.RetrieveVirtualItem += (_, args) =>
         {
@@ -86,6 +108,12 @@ internal sealed class ReaderWindow : Form
             sortColumn = args.Column;
             RefreshRows();
         };
+    }
+
+    private void UpdateFilterButton()
+    {
+        string action = filtersExpanded ? "Hide filters" : "Show filters";
+        toggleFilters.Text = filters.HasFilters ? $"{action} (active)" : action;
     }
 
     private async void OpenFolder(object? sender, EventArgs args)
@@ -110,6 +138,24 @@ internal sealed class ReaderWindow : Form
         result = imported;
         loading = false;
         open.Enabled = true;
+        ApplyFilters();
+    }
+
+    private void ApplyFilters()
+    {
+        filteredRows = null;
+        if (result is not null && filters.HasFilters)
+        {
+            List<string[]> rows = result.Rows;
+            RecordFilters applied = filters.Applied;
+            var matching = new List<int>();
+            for (int index = 0; index < rows.Count; index++)
+            {
+                if (applied.Matches(rows[index]))
+                    matching.Add(index);
+            }
+            filteredRows = matching.ToArray();
+        }
         RefreshRows();
     }
 
@@ -119,9 +165,11 @@ internal sealed class ReaderWindow : Form
             return;
         string query = search.Text;
         List<string[]> rows = result.Rows;
-        var matches = new List<int>(rows.Count);
-        for (int index = 0; index < rows.Count; index++)
+        int candidateCount = filteredRows?.Length ?? rows.Count;
+        var matches = new List<int>(candidateCount);
+        for (int offset = 0; offset < candidateCount; offset++)
         {
+            int index = filteredRows?[offset] ?? offset;
             if (query.Length == 0 || rows[index].Any(cell => cell.Contains(query, StringComparison.OrdinalIgnoreCase)))
                 matches.Add(index);
         }

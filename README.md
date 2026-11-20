@@ -44,3 +44,5 @@ dotnet publish csharp/CubeCdrReader.csproj -c Release -r win-x64 --self-containe
 ```
 
 Run `publish-csharp/CUBE-CDR-Reader.exe` and use **Open Folder** to load your accounting files.
+
+Choose **Show filters** to narrow the grid by setup date and time, duration, calling and called numbers, and other record fields. Use the checkboxes to enable either date bound and enter duration bounds in seconds. The date range uses the CUBE timestamp as displayed and includes the entire final second. Text fields match partial values without regard to case. Click **Apply filters** to require every selected filter, together with any text in **Search all**. **Clear filters** resets the panel while preserving the search.
