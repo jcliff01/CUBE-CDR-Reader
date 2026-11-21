@@ -1,0 +1,34 @@
+name: Publish Windows x64 release
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/publish-windows.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 50fe54f1d71527a572171999c7a0b5129a5f55af
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.419
+      - name: Build Windows x64 executable
+        shell: pwsh
+        run: |
+          dotnet publish CubeCdrReader.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+          Move-Item publish/CUBE-CDR-Reader.exe publish/CUBE-CDR-Reader-Win-x64.exe
+      - name: Publish executable
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create v1.0.0-csharp publish/CUBE-CDR-Reader-Win-x64.exe
+          --target 50fe54f1d71527a572171999c7a0b5129a5f55af
+          --title "CUBE CDR Reader for Windows 11 x64"
+          --notes "Self-contained C# build with 12 filters. Download the executable under Assets."
