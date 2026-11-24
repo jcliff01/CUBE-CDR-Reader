@@ -29,3 +29,11 @@ dotnet publish CubeCdrReader.csproj -c Release -r win-x64 --self-contained true 
 Run `publish/CUBE-CDR-Reader.exe` on Windows x64. The published executable includes the .NET Desktop Runtime.
 
 [Cisco IOS Voice Gateway CDR accounting reference](https://www.cisco.com/c/en/us/td/docs/ios/voice/cdr/developer/manual/cdrdev.pdf)
+
+## Sharing sample records
+
+Use synthetic or redacted CDRs in bug reports. Remove calling and called numbers, signaling IP addresses, and call identifiers before attaching records. Include the reader version and record format when reporting a parsing issue.
+
+## License
+
+Project code is available under the [MIT License](LICENSE).
