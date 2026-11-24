@@ -2,7 +2,11 @@
 
 A C# Windows desktop reader for Cisco Unified Border Element file-accounting records. Open a single log or load the supported files in a folder. The reader opens logs read-only and displays one row per accounting record. A call can have multiple records.
 
-## Download
+## Portable C version
+
+[Download the original portable Windows executable](https://raw.githubusercontent.com/jcliff01/CUBE-CDR-Reader/c-portable/CUBE-CDR-Reader.exe) (43 KB), or [browse the C source and build instructions](https://github.com/jcliff01/CUBE-CDR-Reader/tree/c-portable). The executable runs without .NET. The C# edition below includes the twelve-filter interface.
+
+## C# download
 
 [Download CUBE-CDR-Reader-Win-x64.exe](https://github.com/jcliff01/CUBE-CDR-Reader/releases/download/v1.0.0-csharp/CUBE-CDR-Reader-Win-x64.exe) for Windows 11 x64. The .NET Desktop Runtime is included.
 
