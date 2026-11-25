@@ -1,0 +1,29 @@
+name: Screenshot
+
+# Builds the reader, opens the made-up sample file in samples/, and saves a picture of the window
+# as an artifact. Used for the README; run it by hand after changing the window.
+on:
+  workflow_dispatch:
+  push:
+    branches: [docs-and-fixes]
+
+permissions:
+  contents: read
+
+jobs:
+  screenshot:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build
+        run: dotnet build CubeCdrReader.csproj -c Release -o out
+      - name: Open the sample and take a screenshot
+        shell: pwsh
+        run: ./.github/capture.ps1 -Exe out/CUBE-CDR-Reader.exe -Arguments "`"$PWD\samples\sample-cdrs.csv`"" -Out screenshot.png -Wait 6
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshot
+          path: screenshot.png

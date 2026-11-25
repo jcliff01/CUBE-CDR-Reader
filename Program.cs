@@ -5,10 +5,12 @@ namespace CubeCdrReader;
 internal static class Program
 {
     [STAThread]
-    private static void Main()
+    // A file or folder given on the command line (or dropped onto the .exe, or chosen with
+    // "Open with") is opened as soon as the window appears.
+    private static void Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
-        Application.Run(new ReaderWindow());
+        Application.Run(new ReaderWindow(args.Length > 0 ? args[0] : null));
     }
 }
 
@@ -46,9 +48,21 @@ internal sealed class ReaderWindow : Form
     private bool descending;
     private bool loading;
 
-    internal ReaderWindow()
+    internal ReaderWindow(string? startPath = null)
     {
         Text = "CUBE CDR Reader";
+        if (startPath is not null)
+        {
+            Shown += async (_, _) =>
+            {
+                if (Directory.Exists(startPath))
+                    await LoadLogs(() => LogReader.ReadFolder(startPath));
+                else if (File.Exists(startPath))
+                    await LoadLogs(() => LogReader.ReadFile(startPath));
+                else
+                    status.Text = "Not found: " + startPath;
+            };
+        }
         ClientSize = new Size(1150, 660);
         MinimumSize = new Size(850, 440);
         AutoScaleMode = AutoScaleMode.Dpi;
