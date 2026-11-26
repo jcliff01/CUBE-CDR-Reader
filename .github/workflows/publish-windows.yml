@@ -1,7 +1,8 @@
 name: Publish Windows x64 release
 
-# Push a tag such as v1.1.0 (or run it by hand with a tag name) to build that version and attach
-# CUBE-CDR-Reader-Win-x64.exe to a GitHub release of the same name.
+# Push a tag such as v1.1.0 (or run it by hand with a tag name) to test and build that version and
+# attach the program to a GitHub release of the same name. The tag must match <Version> in
+# Directory.Build.props, without the leading "v".
 on:
   push:
     tags: ['v*']
@@ -26,17 +27,27 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+      - name: Check the tag matches the version
+        shell: pwsh
+        run: |
+          $version = ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version
+          if ("v$version" -ne $env:TAG) { throw "Tag $env:TAG doesn't match version $version in Directory.Build.props" }
+      - name: Run the tests
+        run: dotnet test tests/CubeCdrReader.Tests -c Release
       - name: Build Windows x64 executable
         shell: pwsh
         run: |
-          dotnet publish CubeCdrReader.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish
+          dotnet publish src/CubeCdrReader/CubeCdrReader.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish
           Move-Item publish/CUBE-CDR-Reader.exe publish/CUBE-CDR-Reader-Win-x64.exe
-      - name: Publish executable
+          Copy-Item legacy/c-portable/CUBE-CDR-Reader.exe publish/CUBE-CDR-Reader-Portable-C.exe
+          Get-FileHash publish/*.exe -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } | Set-Content publish/SHA256SUMS.txt
+      - name: Publish release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: >
-          gh release create "$TAG" publish/CUBE-CDR-Reader-Win-x64.exe
+          gh release create "$TAG"
+          publish/CUBE-CDR-Reader-Win-x64.exe publish/CUBE-CDR-Reader-Portable-C.exe publish/SHA256SUMS.txt
           --verify-tag
           --title "CUBE CDR Reader $TAG for Windows x64"
-          --notes "Self-contained Windows x64 build. Download CUBE-CDR-Reader-Win-x64.exe under Assets; nothing else to install."
+          --notes "Download CUBE-CDR-Reader-Win-x64.exe under Assets; nothing else to install. CUBE-CDR-Reader-Portable-C.exe is the small original version for older PCs. See CHANGELOG.md for what changed."

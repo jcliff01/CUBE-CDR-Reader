@@ -2,14 +2,14 @@ using System.Globalization;
 
 namespace CubeCdrReader;
 
-internal sealed record RecordFilters(
+public sealed record RecordFilters(
     DateTime? SetupFrom = null,
     DateTime? SetupThrough = null,
     double? MinimumDuration = null,
     double? MaximumDuration = null,
     (Column Column, string Value)[]? Fields = null)
 {
-    internal bool Matches(string[] row)
+    public bool Matches(string[] row)
     {
         if (Fields is not null)
         {

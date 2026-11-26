@@ -1,12 +1,9 @@
 name: Screenshot
 
-# Builds the reader, opens the made-up sample file in samples/, and saves a picture of the window
-# as an artifact. Used for the README; run it by hand after changing the window.
+# Builds the reader, opens the made-up sample file in samples/, and commits a picture of the window
+# to docs/screenshot.png on the branch it runs on. Run it by hand after changing the window.
 on:
   workflow_dispatch:
-  push:
-    branches: [docs-and-fixes]
-    paths: ['.github/workflows/screenshot.yml', '.github/capture.ps1', 'samples/**', '*.cs']
 
 permissions:
   contents: write
@@ -20,9 +17,8 @@ jobs:
         with:
           dotnet-version: '8.0.x'
       - name: Build
-        run: dotnet build CubeCdrReader.csproj -c Release -o out
-      - name: Open the sample and take a screenshot
-        # docs/ must exist before the picture is saved there
+        run: dotnet build src/CubeCdrReader/CubeCdrReader.csproj -c Release -o out
+      - name: Make the docs folder
         shell: pwsh
         run: New-Item -ItemType Directory -Force docs | Out-Null
       - name: Take the screenshot

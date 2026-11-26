@@ -3,16 +3,16 @@ using System.Text;
 
 namespace CubeCdrReader;
 
-internal sealed class ImportResult
+public sealed class ImportResult
 {
-    internal List<string[]> Rows { get; } = [];
-    internal int Files { get; set; }
-    internal int Skipped { get; set; }
-    internal int Errors { get; set; }
-    internal bool Limited { get; set; }
+    public List<string[]> Rows { get; } = [];
+    public int Files { get; set; }
+    public int Skipped { get; set; }
+    public int Errors { get; set; }
+    public bool Limited { get; set; }
 }
 
-internal static class LogReader
+public static class LogReader
 {
     private const int MaxRows = 250_000;
     private const int MaxLine = 262_143;
@@ -28,14 +28,14 @@ internal static class LogReader
         return Encoding.GetEncoding(OperatingSystem.IsWindows() ? (int)GetACP() : 1252);
     }
 
-    internal static ImportResult ReadFile(string path)
+    public static ImportResult ReadFile(string path)
     {
         var result = new ImportResult();
         TryReadFile(path, result);
         return result;
     }
 
-    internal static ImportResult ReadFolder(string folder)
+    public static ImportResult ReadFolder(string folder)
     {
         var result = new ImportResult();
         try

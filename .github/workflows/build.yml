@@ -9,12 +9,22 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Run the tests
+        run: dotnet test tests/CubeCdrReader.Tests -c Release
+
+  build-app:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - name: Build
-        run: dotnet build CubeCdrReader.csproj -c Release
+      - name: Build the Windows app
+        run: dotnet build src/CubeCdrReader/CubeCdrReader.csproj -c Release
