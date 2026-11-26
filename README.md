@@ -1,43 +1,74 @@
 # CUBE CDR Reader
 
-A C# Windows desktop reader for Cisco Unified Border Element file-accounting records. Open a single log or load the supported files in a folder. The reader opens logs read-only and displays one row per accounting record. A call can have multiple records.
+CUBE CDR Reader opens the call records (CDRs) that a Cisco Unified Border Element (CUBE) writes, and shows them as a table you can sort and filter. Use it to answer questions like "which calls to this number failed yesterday?" without reading raw log files. It only reads your files and never changes them.
 
-## Portable C version
+![CUBE CDR Reader showing the 48 made-up calls in the sample file, with the filter boxes above the table](docs/screenshot.png)
 
-[Download the original portable Windows executable](https://raw.githubusercontent.com/jcliff01/CUBE-CDR-Reader/c-portable/CUBE-CDR-Reader.exe) (43 KB), or [browse the C source and build instructions](https://github.com/jcliff01/CUBE-CDR-Reader/tree/c-portable). The executable runs without .NET. The C# edition below includes the twelve-filter interface.
+![Windows only](https://img.shields.io/badge/runs%20on-Windows%2010%20%2F%2011%20x64-blue)
 
-## C# download
+## Download and run (Windows)
 
-[Download CUBE-CDR-Reader-Win-x64.exe](https://github.com/jcliff01/CUBE-CDR-Reader/releases/download/v1.0.0-csharp/CUBE-CDR-Reader-Win-x64.exe) for Windows 11 x64. The .NET Desktop Runtime is included.
+1. Download **[CUBE-CDR-Reader-Win-x64.exe](https://github.com/jcliff01/CUBE-CDR-Reader/releases/download/v1.0.0-csharp/CUBE-CDR-Reader-Win-x64.exe)**. It is one file with everything included; there is nothing to install.
+2. Double-click it.
+3. If Windows shows **"Windows protected your PC"**, click **More info**, then **Run anyway**. The program isn't code-signed, so Windows doesn't recognize the publisher.
+4. Click **Open log file…** to open one file, or **Open folder…** to open every record file in a folder. You can also drag a file or folder onto CUBE-CDR-Reader.exe.
 
-## Supported files
+**Older or locked-down PC?** The [original portable version](https://raw.githubusercontent.com/jcliff01/CUBE-CDR-Reader/c-portable/CUBE-CDR-Reader.exe) is a 43 KB program that also runs without anything installed. It has fewer filters. Its source code is on the [`c-portable` branch](https://github.com/jcliff01/CUBE-CDR-Reader/tree/c-portable).
 
-- Cisco headerless detailed and compact VoIP file-accounting records.
-- Named CSV exports with headings such as `h323-setup-time`, `clid`, `dnis`, and `duration-seconds`.
-- Folder import scans the top level for CSV, CDR, LOG, TXT, extensionless files and filenames with numeric suffixes. The status bar shows file errors, skipped rows, and the import limit of 250,000 records.
+## macOS and Linux
 
-The reader uses explicit duration in seconds when available. Otherwise it calculates connected duration from connect and disconnect timestamps when their zone labels match. Setup filters use the logged clock values. The upper setup bound includes the entire selected second.
+The reader is a Windows program. On a Mac or Linux computer, run it inside a Windows virtual machine (for example Parallels on a Mac, or VirtualBox on Linux). It doesn't run under Wine.
 
-## Filters
+## Try it with the sample file
 
-The twelve controls are setup from, setup through, minimum duration, maximum duration, calling number, called number, codec, cause code, disconnected by, remote signaling IP, call ID, and forwarded status. **Apply filters** requires all enabled controls to match. Text filters match substrings without regard to case. Forwarded status matches the selected status exactly. Click a column heading to sort and **Clear filters** to reset the form.
+The file [`samples/sample-cdrs.csv`](samples/sample-cdrs.csv) holds 48 made-up calls (every number and address is invented). Download it, then open it with **Open log file…**, or drag it onto CUBE-CDR-Reader.exe. The picture above shows that file.
 
-## Build
+## Which files it reads
 
-Install the .NET 8 SDK and run:
+- The CUBE's file-accounting records, in either the detailed or the compact format (the files have no header row).
+- CSV exports with column names such as `h323-setup-time`, `clid`, `dnis` and `duration-seconds`.
+
+When you open a folder, it reads the files directly in that folder, not in subfolders: files ending in `.csv`, `.cdr`, `.log` or `.txt`, files with no extension, and files ending in a number. It loads up to 250,000 records. The status bar at the bottom shows how many lines it skipped and any files it couldn't read.
+
+One call can have several records, one for each call leg.
+
+## Filtering
+
+There are twelve filters: setup time from and through, minimum and maximum duration, calling number, called number, codec, cause code, who disconnected, remote signaling IP, call ID, and whether the call was forwarded.
+
+1. Fill in the filters you want. Leave the others empty.
+2. Click **Apply filters**. A record is shown only if it matches every filter you filled in.
+3. Click **Clear filters** to show everything again.
+
+Text filters match part of a value and ignore upper and lower case: `555` finds `+15551234`. Click a column heading to sort by it.
+
+Durations come from the record's duration in seconds when it has one. Otherwise the reader works them out from the connect and disconnect times. Setup-time filters use the CUBE's own clock, and the "through" time includes the whole second you pick.
+
+## Troubleshooting
+
+| What you see | What to do |
+| --- | --- |
+| Windows won't open the file | See step 3 above. Some company PCs block unsigned programs; ask IT to allow it. |
+| Fewer rows than you expected | Check the skipped-line count in the status bar. Lines that aren't call records are skipped on purpose. |
+| A file is listed as an error | Another program may be holding it locked, or you don't have permission to read it. |
+| Stops at 250,000 records | Open a smaller folder, or fewer days of files. |
+
+## Sharing examples
+
+Call records hold phone numbers and network addresses. Before attaching records to a bug report, replace the calling and called numbers, IP addresses and call IDs with made-up values. Say which version you used and which record format the file is in.
+
+## Build it yourself (developers)
+
+You need Windows and the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) (`winget install Microsoft.DotNet.SDK.8`). In PowerShell, in this folder:
 
 ```powershell
-dotnet publish CubeCdrReader.csproj -c Release -r win-x64 --self-contained true -p:EnableWindowsTargeting=true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+dotnet publish CubeCdrReader.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish
 ```
 
-Run `publish/CUBE-CDR-Reader.exe` on Windows x64. The published executable includes the .NET Desktop Runtime.
+The program is `publish\CUBE-CDR-Reader.exe`. To publish a new release, push a tag such as `v1.1.0`; the **Publish Windows x64 release** workflow builds it and attaches the program to a release of the same name.
 
-[Cisco IOS Voice Gateway CDR accounting reference](https://www.cisco.com/c/en/us/td/docs/ios/voice/cdr/developer/manual/cdrdev.pdf)
-
-## Sharing sample records
-
-Use synthetic or redacted CDRs in bug reports. Remove calling and called numbers, signaling IP addresses, and call identifiers before attaching records. Include the reader version and record format when reporting a parsing issue.
+Format reference: [Cisco IOS Voice Gateway CDR accounting](https://www.cisco.com/c/en/us/td/docs/ios/voice/cdr/developer/manual/cdrdev.pdf).
 
 ## License
 
-Project code is available under the [MIT License](LICENSE).
+[MIT](LICENSE).

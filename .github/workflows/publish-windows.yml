@@ -1,9 +1,15 @@
 name: Publish Windows x64 release
+
+# Push a tag such as v1.1.0 (or run it by hand with a tag name) to build that version and attach
+# CUBE-CDR-Reader-Win-x64.exe to a GitHub release of the same name.
 on:
   push:
-    branches: [main]
-    paths: [.github/workflows/publish-windows.yml]
+    tags: ['v*']
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build and publish, for example v1.1.0
+        required: true
 
 permissions:
   contents: write
@@ -11,24 +17,26 @@ permissions:
 jobs:
   publish:
     runs-on: windows-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 50fe54f1d71527a572171999c7a0b5129a5f55af
+          ref: ${{ env.TAG }}
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.419
+          dotnet-version: '8.0.x'
       - name: Build Windows x64 executable
         shell: pwsh
         run: |
-          dotnet publish CubeCdrReader.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+          dotnet publish CubeCdrReader.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish
           Move-Item publish/CUBE-CDR-Reader.exe publish/CUBE-CDR-Reader-Win-x64.exe
       - name: Publish executable
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: >
-          gh release create v1.0.0-csharp publish/CUBE-CDR-Reader-Win-x64.exe
-          --target 50fe54f1d71527a572171999c7a0b5129a5f55af
-          --title "CUBE CDR Reader for Windows 11 x64"
-          --notes "Self-contained C# build with 12 filters. Download the executable under Assets."
+          gh release create "$TAG" publish/CUBE-CDR-Reader-Win-x64.exe
+          --verify-tag
+          --title "CUBE CDR Reader $TAG for Windows x64"
+          --notes "Self-contained Windows x64 build. Download CUBE-CDR-Reader-Win-x64.exe under Assets; nothing else to install."
