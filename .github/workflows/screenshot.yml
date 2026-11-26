@@ -8,7 +8,7 @@ on:
     branches: [docs-and-fixes]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   screenshot:
@@ -21,9 +21,17 @@ jobs:
       - name: Build
         run: dotnet build CubeCdrReader.csproj -c Release -o out
       - name: Open the sample and take a screenshot
+        # docs/ must exist before the picture is saved there
         shell: pwsh
-        run: ./.github/capture.ps1 -Exe out/CUBE-CDR-Reader.exe -Arguments "`"$PWD\samples\sample-cdrs.csv`"" -Out screenshot.png -Wait 6
-      - uses: actions/upload-artifact@v4
-        with:
-          name: screenshot
-          path: screenshot.png
+        run: New-Item -ItemType Directory -Force docs | Out-Null
+      - name: Take the screenshot
+        shell: pwsh
+        run: ./.github/capture.ps1 -Exe out/CUBE-CDR-Reader.exe -Arguments "`"$PWD\samples\sample-cdrs.csv`"" -Out docs/screenshot.png -Wait 6
+      - name: Save the picture to the branch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/screenshot.png
+          git commit -m "Update the README screenshot" || echo "No change"
+          git push
