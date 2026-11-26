@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Parsing, filtering and export. No Windows dependencies, so tests run on any OS. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>CubeCdrReader</RootNamespace>
+  </PropertyGroup>
+</Project>

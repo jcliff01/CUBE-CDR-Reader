@@ -5,24 +5,20 @@ namespace CubeCdrReader;
 internal static class Program
 {
     [STAThread]
-    private static void Main()
+    // A file or folder given on the command line (or dropped onto the .exe, or chosen with
+    // "Open with") is opened as soon as the window appears.
+    private static void Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
-        Application.Run(new ReaderWindow());
+        Application.Run(new ReaderWindow(args.Length > 0 ? args[0] : null));
     }
 }
 
 internal sealed class ReaderWindow : Form
 {
-    private static readonly string[] ColumnTitles =
-    [
-        "Setup time", "Calling number", "Called number", "Duration (s)", "Codec",
-        "Disconnected by", "Cause code", "Disconnect reason", "Forwarded", "Forwarded to",
-        "Remote signaling IP", "Remote SIP port", "Remote UDP port", "Remote media IP",
-        "Remote media port", "Local signaling IP", "Local SIP port", "Local media IP",
-        "Local media port", "Connect time", "Disconnect time", "Call origin", "Call ID",
-        "Conference ID", "Source file / line"
-    ];
+    private static readonly IReadOnlyList<string> ColumnTitles = CsvExport.ColumnTitles;
+    private static readonly string AppTitle = "CUBE CDR Reader " +
+        (typeof(ReaderWindow).Assembly.GetName().Version?.ToString(3) ?? "");
 
     private readonly DateTimePicker start = SetupPicker();
     private readonly DateTimePicker end = SetupPicker();
@@ -32,7 +28,11 @@ internal sealed class ReaderWindow : Form
     private readonly ComboBox forwarded = new() { DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly Button openFile = new() { Text = "Open log file…", AutoSize = true };
     private readonly Button openFolder = new() { Text = "Open folder…", AutoSize = true };
-    private readonly Label status = new() { Text = "Open a Cisco CUBE accounting log or folder.", AutoSize = true };
+    private readonly Button export = new() { Text = "Export to CSV…", AutoSize = true, Enabled = false };
+    private readonly Label status = new()
+    {
+        Text = "Open a Cisco CUBE accounting log or folder, or drag one onto this window.", AutoSize = true
+    };
     private readonly ListView grid = new()
     {
         Dock = DockStyle.Fill, View = View.Details, VirtualMode = true,
@@ -46,9 +46,23 @@ internal sealed class ReaderWindow : Form
     private bool descending;
     private bool loading;
 
-    internal ReaderWindow()
+    internal ReaderWindow(string? startPath = null)
     {
-        Text = "CUBE CDR Reader";
+        Text = AppTitle;
+        if (startPath is not null)
+            Shown += async (_, _) => await OpenPath(startPath);
+
+        AllowDrop = true;
+        DragEnter += (_, args) =>
+        {
+            if (!loading && args.Data?.GetDataPresent(DataFormats.FileDrop) == true)
+                args.Effect = DragDropEffects.Copy;
+        };
+        DragDrop += async (_, args) =>
+        {
+            if (!loading && args.Data?.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } paths)
+                await OpenPath(paths[0]);
+        };
         ClientSize = new Size(1150, 660);
         MinimumSize = new Size(850, 440);
         AutoScaleMode = AutoScaleMode.Dpi;
@@ -63,7 +77,7 @@ internal sealed class ReaderWindow : Form
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
         var toolbar = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false };
-        toolbar.Controls.AddRange([openFile, openFolder]);
+        toolbar.Controls.AddRange([openFile, openFolder, export]);
         layout.Controls.Add(toolbar, 0, 0);
         layout.Controls.Add(BuildFilters(), 0, 1);
         layout.Controls.Add(grid, 0, 2);
@@ -85,6 +99,71 @@ internal sealed class ReaderWindow : Form
         };
         openFile.Click += OpenFile;
         openFolder.Click += OpenFolder;
+        export.Click += ExportRows;
+        grid.KeyDown += (_, args) =>
+        {
+            if (args.Control && args.KeyCode == Keys.C)
+            {
+                CopySelection();
+                args.Handled = true;
+            }
+            else if (args.Control && args.KeyCode == Keys.A)
+            {
+                grid.BeginUpdate();
+                for (int index = 0; index < visible.Count; index++)
+                    grid.SelectedIndices.Add(index);
+                grid.EndUpdate();
+                args.Handled = true;
+            }
+        };
+        var menu = new ContextMenuStrip();
+        menu.Items.Add("Copy selected rows", null, (_, _) => CopySelection());
+        menu.Items.Add("Export shown rows to CSV…", null, ExportRows);
+        grid.ContextMenuStrip = menu;
+    }
+
+    private async Task OpenPath(string path)
+    {
+        if (Directory.Exists(path))
+            await LoadLogs(() => LogReader.ReadFolder(path));
+        else if (File.Exists(path))
+            await LoadLogs(() => LogReader.ReadFile(path));
+        else
+            status.Text = "Not found: " + path;
+    }
+
+    private void CopySelection()
+    {
+        var rows = grid.SelectedIndices.Cast<int>().Order().Select(index => visible[index]).ToList();
+        if (rows.Count == 0)
+            return;
+        Clipboard.SetText(CsvExport.ToClipboardText(rows));
+        status.Text = $"Copied {rows.Count:N0} rows. Paste them into a spreadsheet.";
+    }
+
+    private void ExportRows(object? sender, EventArgs args)
+    {
+        if (visible.Count == 0)
+            return;
+        using var dialog = new SaveFileDialog
+        {
+            Title = "Export shown records",
+            Filter = "CSV file (*.csv)|*.csv",
+            FileName = $"cube-cdrs-{DateTime.Now:yyyyMMdd-HHmmss}.csv",
+            OverwritePrompt = true
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+            return;
+        try
+        {
+            CsvExport.WriteFile(dialog.FileName, visible);
+            status.Text = $"Exported {visible.Count:N0} records to {Path.GetFileName(dialog.FileName)}.";
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, "Couldn't save the file: " + error.Message, AppTitle,
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
     }
 
     private Control BuildFilters()
@@ -174,13 +253,13 @@ internal sealed class ReaderWindow : Form
         DateTime? through = CheckedSecond(end);
         if (from > through)
         {
-            MessageBox.Show(this, "Setup from must be at or before setup through.", Text);
+            MessageBox.Show(this, "Setup from must be at or before setup through.", AppTitle);
             return;
         }
 
         if (!ReadDuration(minimum, out double? min) || !ReadDuration(maximum, out double? max) || min > max)
         {
-            MessageBox.Show(this, "Enter nonnegative durations with minimum at or below maximum.", Text);
+            MessageBox.Show(this, "Enter nonnegative durations with minimum at or below maximum.", AppTitle);
             return;
         }
 
@@ -213,11 +292,18 @@ internal sealed class ReaderWindow : Form
     private async Task LoadLogs(Func<ImportResult> read)
     {
         loading = true;
-        openFile.Enabled = openFolder.Enabled = false;
+        openFile.Enabled = openFolder.Enabled = export.Enabled = false;
         status.Text = "Reading CUBE accounting records…";
         try
         {
             imported = await Task.Run(read);
+        }
+        catch (Exception error)
+        {
+            // Anything unexpected is reported instead of closing the program.
+            status.Text = "Couldn't read the records.";
+            MessageBox.Show(this, "Couldn't read the records: " + error.Message, AppTitle,
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         finally
         {
@@ -243,6 +329,7 @@ internal sealed class ReaderWindow : Form
         visible = matches;
         grid.VirtualListSize = visible.Count;
         grid.Invalidate();
+        export.Enabled = visible.Count > 0;
         status.Text = $"{visible.Count:N0} of {imported.Rows.Count:N0} records  |  " +
             $"{imported.Files:N0} files read  |  {imported.Skipped:N0} skipped rows  |  {imported.Errors:N0} file errors" +
             (imported.Limited ? "  |  250,000-record import limit reached" : "");

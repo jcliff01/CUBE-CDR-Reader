@@ -1,0 +1,34 @@
+name: Screenshot
+
+# Builds the reader, opens the made-up sample file in samples/, and commits a picture of the window
+# to docs/screenshot.png on the branch it runs on. Run it by hand after changing the window.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  screenshot:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build
+        run: dotnet build src/CubeCdrReader/CubeCdrReader.csproj -c Release -o out
+      - name: Make the docs folder
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force docs | Out-Null
+      - name: Take the screenshot
+        shell: pwsh
+        run: ./.github/capture.ps1 -Exe out/CUBE-CDR-Reader.exe -Arguments "`"$PWD\samples\sample-cdrs.csv`"" -Out docs/screenshot.png -Wait 6
+      - name: Save the picture to the branch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/screenshot.png
+          git commit -m "Update the README screenshot" || echo "No change"
+          git push

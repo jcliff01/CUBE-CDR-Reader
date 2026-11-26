@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 
 namespace CubeCdrReader;
 
-internal enum Column
+public enum Column
 {
     Setup, Calling, Called, Duration, Codec, Release, Cause, Reason,
     Forwarded, ForwardedTo, RemoteIp, RemoteSipPort, RemoteUdpPort,
@@ -12,9 +12,9 @@ internal enum Column
     Connect, End, Leg, CallId, Conference, Source
 }
 
-internal static class Cdr
+public static class Cdr
 {
-    internal const int ColumnCount = (int)Column.Source + 1;
+    public const int ColumnCount = (int)Column.Source + 1;
 
     private static readonly string[][] Keys =
     [
@@ -55,9 +55,9 @@ internal static class Cdr
         "External call-control agent"
     ];
 
-    internal sealed record Schema(int[] Columns, int Feature, int FeatureStatus, int FeatureTarget);
+    public sealed record Schema(int[] Columns, int Feature, int FeatureStatus, int FeatureTarget);
 
-    internal static string[]? Split(string line)
+    public static string[]? Split(string line)
     {
         var fields = new List<string>();
         int position = 0;
@@ -110,7 +110,7 @@ internal static class Cdr
     private static string Field(string[] fields, int index) =>
         (uint)index < fields.Length ? fields[index] : "";
 
-    internal static Schema? Header(string[] fields)
+    public static Schema? Header(string[] fields)
     {
         string[] names = fields.Select(Key).ToArray();
         int Find(string[] aliases)
@@ -190,6 +190,9 @@ internal static class Cdr
         if (!detailed || Digits(Field(fields, codec)))
             codec = -1;
 
+        // Forwarding feature fields (CFA, CFNA, CFBY) sit at cause + 12 in the compact layout and
+        // from field 100 onward in the detailed layout. The loop checks cause + 12 first, then
+        // jumps straight to field 100; the fields in between are not checked.
         int feature = -1;
         for (int index = cause + 12; index + 1 < fields.Length; index = Math.Max(index + 1, 100))
         {
@@ -212,7 +215,7 @@ internal static class Cdr
     private static readonly Regex CiscoTime = new(
         @"^\*?(?<clock>[0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2})(?:\.(?<fraction>[0-9]*))?\s*(?<zone>\S{1,15})\s+\S{1,15}\s+(?<month>[A-Za-z]{3})\s+(?<day>[0-9]{1,2})\s+(?<year>[0-9]{4})\z");
 
-    internal static (DateTime Clock, string Zone)? Timestamp(string value)
+    public static (DateTime Clock, string Zone)? Timestamp(string value)
     {
         Match match = IsoTime.Match(value);
         string text;
@@ -258,7 +261,7 @@ internal static class Cdr
         : value.Split('.') is { Length: 4 } octets &&
           octets.All(octet => octet.Length <= 3 && Digits(octet) && byte.TryParse(octet, out _));
 
-    internal static string[]? Record(string[] fields, Schema? header)
+    public static string[]? Record(string[] fields, Schema? header)
     {
         Schema? schema = header ?? Positional(fields);
         if (schema is null)
