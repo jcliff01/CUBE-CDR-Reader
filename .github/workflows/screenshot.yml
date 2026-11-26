@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
   push:
     branches: [docs-and-fixes]
+    paths: ['.github/workflows/screenshot.yml', '.github/capture.ps1', 'samples/**', '*.cs']
 
 permissions:
   contents: write

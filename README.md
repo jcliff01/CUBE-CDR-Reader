@@ -2,6 +2,8 @@
 
 CUBE CDR Reader opens the call records (CDRs) that a Cisco Unified Border Element (CUBE) writes, and shows them as a table you can sort and filter. Use it to answer questions like "which calls to this number failed yesterday?" without reading raw log files. It only reads your files and never changes them.
 
+![CUBE CDR Reader showing the 48 made-up calls in the sample file, with the filter boxes above the table](docs/screenshot.png)
+
 ![Windows only](https://img.shields.io/badge/runs%20on-Windows%2010%20%2F%2011%20x64-blue)
 
 ## Download and run (Windows)
@@ -9,13 +11,17 @@ CUBE CDR Reader opens the call records (CDRs) that a Cisco Unified Border Elemen
 1. Download **[CUBE-CDR-Reader-Win-x64.exe](https://github.com/jcliff01/CUBE-CDR-Reader/releases/download/v1.0.0-csharp/CUBE-CDR-Reader-Win-x64.exe)**. It is one file with everything included; there is nothing to install.
 2. Double-click it.
 3. If Windows shows **"Windows protected your PC"**, click **More info**, then **Run anyway**. The program isn't code-signed, so Windows doesn't recognize the publisher.
-4. Click **Open log file…** to open one file, or **Open folder…** to open every record file in a folder.
+4. Click **Open log file…** to open one file, or **Open folder…** to open every record file in a folder. You can also drag a file or folder onto CUBE-CDR-Reader.exe.
 
 **Older or locked-down PC?** The [original portable version](https://raw.githubusercontent.com/jcliff01/CUBE-CDR-Reader/c-portable/CUBE-CDR-Reader.exe) is a 43 KB program that also runs without anything installed. It has fewer filters. Its source code is on the [`c-portable` branch](https://github.com/jcliff01/CUBE-CDR-Reader/tree/c-portable).
 
 ## macOS and Linux
 
 The reader is a Windows program. On a Mac or Linux computer, run it inside a Windows virtual machine (for example Parallels on a Mac, or VirtualBox on Linux). It doesn't run under Wine.
+
+## Try it with the sample file
+
+The file [`samples/sample-cdrs.csv`](samples/sample-cdrs.csv) holds 48 made-up calls (every number and address is invented). Download it, then open it with **Open log file…**, or drag it onto CUBE-CDR-Reader.exe. The picture above shows that file.
 
 ## Which files it reads
 
